@@ -42,6 +42,9 @@ const bodyParser = require('body-parser');
 const { Webhook, MessageBuilder } = require('discord-webhook-node');
 const config = require('./config.json');
 
+config.webhook_link = process.env.WEBHOOK_LINK
+config.verification_token = process.env.VERIFICATION_TOKEN;
+
 if(!config) {
     console.error('Config file not found.');
     process.exit(1);
@@ -56,29 +59,37 @@ const webhook = new Webhook(config.webhook_link); //Declaring the Webhook here
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
-app.post('/post', async function(req, res) {
-    const data = req.body.data;
-    if (!data) return;
+app.post("/", async function (req, res) {
+  const data = req.body.data;
+  if (!data) return;
 
-    try {
-        const obj = JSON.parse(data);
-        const embed = new MessageBuilder();
-        embed.setTitle('New Ko-Fi Supporter!');
-        embed.setColor(2730976);
-        embed.addField(`From`, `${obj.from_name}`, true);
-        embed.addField(`Amount`, `${obj.amount}`, true);
-        embed.addField(`Message`, `${obj.message}`);
-        embed.setTimestamp();
-        await webhook.send(embed);
-    } catch (err) {
-        console.error(err);
-        return res.json({success: false, error: err});
+  try {
+    const obj = JSON.parse(data);
+
+    if (obj.verification_token !== config.verification_token) {
+      res.status(401);
+      res.json({ success: false });
+      return;
     }
-    return res.json({success: true});
+    const embed = new MessageBuilder();
+    embed.setTitle("New Ko-Fi Supporter!");
+    embed.setColor(2730976);
+    embed.addField(`From`, `${obj.from_name}`, true);
+    embed.addField(`Amount`, `${obj.amount}`, true);
+    embed.addField(`Message`, `${obj.message}`);
+    embed.setTimestamp();
+    res.status(200);
+    await webhook.send(embed);
+  } catch (err) {
+    res.status(500);
+    console.error(err);
+    return res.json({ success: false, error: err });
+  }
+  return res.json({ success: true });
 });
 
 
-app.use('/', async function(req, res) { //Handiling requests to the main endpoint
+app.get('/', async function(req, res) { //Handiling requests to the main endpoint
     res.json({message: "Ko-Fi Server is online!"});
     return;
 });
